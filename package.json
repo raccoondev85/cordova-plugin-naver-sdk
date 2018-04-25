@@ -1,0 +1,30 @@
+{
+  "name": "cordova-plugin-naver-sdk",
+  "version": "1.0.1",
+  "description": "Naver Cordova SDK Plugin",
+  "cordova": {
+    "id": "cordova-plugin-naver-sdk",
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  },
+  "keywords": [
+    "naver",
+    "login",
+    "naver-sdk",
+    "naveraccount",
+    "ecosystem:cordova",
+    "cordova-android",
+    "cordova-ios"
+  ],
+  "author": "raccoondev85",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raccoondev85/cordova-plugin-naver-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/raccoondev85/cordova-plugin-naver-sdk/issues"
+  }
+}

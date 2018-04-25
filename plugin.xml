@@ -1,0 +1,125 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin id="cordova-plugin-naver-sdk" name="cordova-plugin-naver-sdk" version="1.0.0"
+        xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <name>NaverCordovaSDK</name>
+    <description>Naver Cordova SDK Plugin</description>
+
+    <preference name="OAUTH_CLIENT_ID"/>
+    <preference name="OAUTH_CLIENT_SECRET"/>
+    <preference name="OAUTH_CLIENT_NAME"/>
+
+    <engines>
+        <!-- Requires Gradle building -->
+        <engine name="cordova-android" version=">3.9.9"/>
+        <engine name="cordova-ios" version=">=3.5.0"/>
+    </engines>
+
+    <js-module name="NaverCordovaSDK" src="www/NaverCordovaSDK.js">
+    	<clobbers target="NaverCordovaSDK" />
+    </js-module>
+
+    <!-- Android -->
+    <platform name="android">
+        <config-file parent="/*" target="res/xml/config.xml">
+            <feature name="NaverCordovaSDK">
+                <param name="android-package" value="com.raccoondev85.plugin.naver.NaverCordovaSDK"/>
+            </feature>
+        </config-file>
+
+        <source-file src="src/android/res/values/naver_strings.xml" target-dir="res/values"/>
+        <config-file parent="/*" target="res/values/naver_strings.xml">
+            <string name="naver_client_id">$OAUTH_CLIENT_ID</string>
+            <string name="naver_client_secret">$OAUTH_CLIENT_SECRET</string>
+            <string name="naver_client_name">$OAUTH_CLIENT_NAME</string>
+        </config-file>
+
+        <config-file parent="/*" target="AndroidManifest.xml">
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+        </config-file>
+
+        <framework src="src/android/naver.gradle" custom="true" type="gradleReference" />
+
+		<source-file src="src/android/NaverCordovaSDK.java" target-dir="src/com/raccoondev85/plugin/naver" />
+        <source-file src="src/android/NaverResources.java" target-dir="src/com/raccoondev85/plugin/naver" />
+
+    </platform>
+
+    <!-- ios -->
+    <platform name="ios">
+    <preference name="OAUTH_CLIENT_APP_SCHEME" />
+
+        <config-file parent="/*" target="config.xml">
+            <feature name="NaverCordovaSDK">
+                <param name="ios-package" value="NaverCordovaSDK"/>
+            </feature>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NaverClientID">
+            <string>$OAUTH_CLIENT_ID</string>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NaverClientSecret">
+            <string>$OAUTH_CLIENT_SECRET</string>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NaverClientName">
+            <string>$OAUTH_CLIENT_NAME</string>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NaverAppScheme">
+            <string>$OAUTH_CLIENT_APP_SCHEME</string>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="CFBundleURLTypes">
+            <array>
+                <dict>
+                    <key>CFBundleURLSchemes</key>
+                    <array>
+                        <string>naver-account-login-test</string>
+                    </array>
+                </dict>
+            </array>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="NSAppTransportSecurity">
+            <dict>
+                <key>NSExceptionDomains</key>
+                <dict>
+                    <key>naver.com</key>
+                    <dict>
+                        <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                        <true/>
+                        <key>NSExceptionRequiresForwardSecrecy</key>
+                        <false/>
+                        <key>NSIncludesSubdomains</key>
+                        <true/>
+                    </dict>
+                    <key>naver.net</key>
+                    <dict>
+                        <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                        <true/>
+                        <key>NSExceptionRequiresForwardSecrecy</key>
+                        <false/>
+                        <key>NSIncludesSubdomains</key>
+                        <true/>
+                    </dict>
+                </dict>
+            </dict>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="LSApplicationQueriesSchemes">
+            <array>
+                <string>naversearchapp</string>
+                <string>naversearchthirdlogin</string>
+            </array>
+        </config-file>
+
+       
+        <framework src="src/ios/NaverThirdPartyLogin.framework" custom="true" embed="true" />
+        <header-file src="src/ios/NaverCordovaSDK.h"/>
+        <source-file src="src/ios/NaverCordovaSDK.m"/>
+    </platform>
+
+</plugin>
