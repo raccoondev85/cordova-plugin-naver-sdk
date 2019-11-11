@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-naver-sdk",
-  "version": "1.0.1",
+  "version": "1.0.5",
   "description": "Naver Cordova SDK Plugin",
   "cordova": {
     "id": "cordova-plugin-naver-sdk",

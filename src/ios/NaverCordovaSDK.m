@@ -1,6 +1,7 @@
 #import "NaverCordovaSDK.h"
 #import <Cordova/CDVPlugin.h>
 #import <NaverThirdPartyLogin/NaverThirdPartyLogin.h>
+#import <objc/runtime.h>
 
 @interface NaverCordovaSDK ()
 
@@ -12,18 +13,6 @@
 - (void)pluginInitialize {
     NSLog(@"Start Naver plugin");
 
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_9_0
-    // Add notification listener for handleOpenURL
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(openURL:)
-                                                 name:CDVPluginHandleOpenURLNotification object:nil];
-#endif
-#if __IPHONE_OS_VERSION_MAX_ALLOWED < __IPHONE_9_0
-    // Add notification listener for handleOpenURL
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(openURLWithApplicationSourceAndAnnotation:)
-                                                 name:CDVPluginHandleOpenURLWithAppSourceAndAnnotationNotification object:nil];
- #endif
     // Delegate 설정
     [NaverThirdPartyLoginConnection getSharedInstance].delegate = self;
 
@@ -211,34 +200,71 @@
     self.loginCallbackId = nil;
 }
 
-- (void)openURL:(NSNotification *)notification {
-    NSLog(@"handle url1: %@", [notification object]);
-    NSURL *url = [notification object];
-    
-    if (![url isKindOfClass:[NSURL class]]) {
-        return;
-    }
-    
-     [[NaverThirdPartyLoginConnection getSharedInstance] application:[UIApplication sharedApplication] openURL:url options:nil];
-}
-   
 
-- (void)openURLWithApplicationSourceAndAnnotation:(NSNotification *)notification {
-    NSLog(@"handle url2: %@", [notification object]);
-    NSDictionary*  notificationData = [notification object];
-    
-    if ([notificationData isKindOfClass: NSDictionary.class]){
-        
-        NSURL* url = notificationData[@"url"];
-        NSString* sourceApplication = notificationData[@"sourceApplication"];
-        id annotation = notificationData[@"annotation"];
-        [[NaverThirdPartyLoginConnection getSharedInstance] application:[UIApplication sharedApplication] openURL:url sourceApplication:sourceApplication annotation:annotation];
-        
 
-        if ([url isKindOfClass:NSURL.class] && [sourceApplication isKindOfClass:NSString.class] && annotation) {
-        }
-    }}
 @end
 
 
 
+
+#pragma mark - AppDelegate Overrides
+
+@implementation AppDelegate (NaverCordovaSDK)
+
+void NMethodSwizzle(Class c, SEL originalSelector) {
+    NSString *selectorString = NSStringFromSelector(originalSelector);
+    SEL newSelector = NSSelectorFromString([@"swizzled_naver_" stringByAppendingString:selectorString]);
+    SEL noopSelector = NSSelectorFromString([@"noop_naver_" stringByAppendingString:selectorString]);
+    Method originalMethod, newMethod, noop;
+    originalMethod = class_getInstanceMethod(c, originalSelector);
+    newMethod = class_getInstanceMethod(c, newSelector);
+    noop = class_getInstanceMethod(c, noopSelector);
+    if (class_addMethod(c, originalSelector, method_getImplementation(newMethod), method_getTypeEncoding(newMethod))) {
+        class_replaceMethod(c, newSelector, method_getImplementation(originalMethod) ?: method_getImplementation(noop), method_getTypeEncoding(originalMethod));
+    } else {
+        method_exchangeImplementations(originalMethod, newMethod);
+    }
+}
+
++ (void)load
+{
+    NMethodSwizzle([self class], @selector(application:openURL:sourceApplication:annotation:));
+}
+
+// This method is a duplicate of the other openURL method below, except using the newer iOS (9) API.
+- (BOOL)application:(UIApplication *)application openURL:(NSURL *)url options:(NSDictionary<NSString *,id> *)options {
+    if (!url) {
+        return NO;
+    }
+    [[NaverThirdPartyLoginConnection getSharedInstance] application:application openURL:url sourceApplication:[options valueForKey:@"UIApplicationOpenURLOptionsSourceApplicationKey"] annotation:0x0];
+    
+    NSLog(@"Naver(ori) handle url: %@", url);
+
+
+    // Call existing method
+    return [self swizzled_naver_application:application openURL:url sourceApplication:[options valueForKey:@"UIApplicationOpenURLOptionsSourceApplicationKey"] annotation:0x0];
+}
+
+- (BOOL)noop_naver_application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
+{
+    return NO;
+}
+
+- (BOOL)swizzled_naver_application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
+{
+    if (!url) {
+        return NO;
+    }
+    
+    
+    [[NaverThirdPartyLoginConnection getSharedInstance] application:application openURL:url sourceApplication:sourceApplication annotation:annotation];
+
+
+    if ([url isKindOfClass:NSURL.class] && [sourceApplication isKindOfClass:NSString.class] && annotation) {
+    }
+    NSLog(@"Naver(swizzle) handle url: %@", url);
+    
+    // Call existing method
+    return [self swizzled_naver_application:application openURL:url sourceApplication:sourceApplication annotation:annotation];
+}
+@end
