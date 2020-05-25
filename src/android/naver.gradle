@@ -3,7 +3,7 @@ repositories {
 }
 
 dependencies {
-  compile ('com.naver.nid:naveridlogin-android-sdk:4.2.0')
+  compile ('com.naver.nid:naveridlogin-android-sdk:4.2.6')
 
     // // naveridlogin dependencies
     // def support_version = '25.3.1'

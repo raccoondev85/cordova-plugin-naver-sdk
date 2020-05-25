@@ -82,38 +82,8 @@
  }
 
 
-#pragma mark - Utility methods
-
-- (void)presentWebviewControllerWithRequest:(NSURLRequest *)urlRequest {
-    NLoginThirdPartyOAuth20InAppBrowserViewController *inAppBrowserViewController = [[NLoginThirdPartyOAuth20InAppBrowserViewController alloc] initWithRequest:urlRequest];
-    inAppBrowserViewController.parentOrientation = (UIInterfaceOrientation) [[UIDevice currentDevice] orientation];
-    [[self viewController] presentViewController:inAppBrowserViewController animated:NO completion:nil];
-}
-
-- (void)exchangeKey:(NSString *)aKey withKey:(NSString *)aNewKey inMutableDictionary:(NSMutableDictionary *)aDict {
-    if (![aKey isEqualToString:aNewKey]) {
-        id objectToPreserve = aDict[aKey];
-        aDict[aNewKey] = objectToPreserve;
-        [aDict removeObjectForKey:aKey];
-    }
-}
-
-- (void)buildRequestMeJsonObject:(NSMutableDictionary *)dictionary {
-    NSMutableDictionary *responseDict = dictionary[@"response"];
-    [self exchangeKey:@"enc_id" withKey:@"encryptionId" inMutableDictionary:responseDict];
-    [self exchangeKey:@"profile_image" withKey:@"profileImage" inMutableDictionary:responseDict];
-
-    dictionary[@"response"] = responseDict;
-    [self exchangeKey:@"resultcode" withKey:@"resultCode" inMutableDictionary:dictionary];
-}
-
 
 #pragma mark - NaverThirdPartyLoginConnectionDelegate
-
-- (void)oauth20ConnectionDidOpenInAppBrowserForOAuth:(NSURLRequest *)request {
-    NSLog(@"oauth20ConnectionDidOpenInAppBrowserForOAuth");
-    [self presentWebviewControllerWithRequest:request];
-}
 
 - (void)oauth20ConnectionDidFinishRequestACTokenWithAuthCode {
     NSLog(@"oauth20ConnectionDidFinishRequestACTokenWithAuthCode");
@@ -199,6 +169,22 @@
 
     self.loginCallbackId = nil;
 }
+
+- (void)oauth20Connection:(NaverThirdPartyLoginConnection *)oauthConnection didFailAuthorizationWithRecieveType:(THIRDPARTYLOGIN_RECEIVE_TYPE)recieveType
+{
+    NSLog(@"NaverApp login fail handler");
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[NSString stringWithFormat:@"%u", (THIRDPARTYLOGIN_RECEIVE_TYPE)recieveType]];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:self.loginCallbackId];
+
+    self.loginCallbackId = nil;
+
+}
+
+- (void)oauth20Connection:(NaverThirdPartyLoginConnection *)oauthConnection didFinishAuthorizationWithResult:(THIRDPARTYLOGIN_RECEIVE_TYPE)recieveType
+{
+    NSLog(@"Getting auth code from NaverApp success!");
+}
+
 
 
 
