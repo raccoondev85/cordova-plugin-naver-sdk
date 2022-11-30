@@ -1,24 +1,29 @@
 package com.raccoondev85.plugin.naver;
 
 import android.content.Context;
-import android.os.AsyncTask;
 import android.util.Log;
 
-import com.nhn.android.naverlogin.OAuthLogin;
-import com.nhn.android.naverlogin.OAuthLoginHandler;
+import com.navercorp.nid.NaverIdLoginSDK;
+import com.navercorp.nid.oauth.OAuthLoginCallback;
+import com.navercorp.nid.oauth.NidOAuthBehavior;
+import com.navercorp.nid.oauth.NidOAuthLogin;
+import com.navercorp.nid.profile.NidProfileCallback;
+import com.navercorp.nid.profile.data.NidProfileResponse;
+
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import java.util.Iterator;
+import com.google.gson.Gson;
 
+import java.util.Iterator;
 
 public class NaverCordovaSDK extends CordovaPlugin {
 
     private static final String LOG_TAG = "NaverCordovaSDK";
     private static final boolean DEBUG_LOG = true;
-    private OAuthLogin mOAuthLoginInstance;
+    private NaverIdLoginSDK mOAuthLoginInstance;
 
     @Override
     protected void pluginInitialize() {
@@ -26,9 +31,10 @@ public class NaverCordovaSDK extends CordovaPlugin {
 
         try{
             NaverResources.initResources(cordova.getActivity().getApplication());
-            mOAuthLoginInstance = OAuthLogin.getInstance();
+
+            mOAuthLoginInstance = NaverIdLoginSDK.INSTANCE;
             mOAuthLoginInstance.showDevelopersLog(DEBUG_LOG);
-            mOAuthLoginInstance.init(cordova.getActivity(), NaverResources.OAUTH_CLIENT_ID,
+            mOAuthLoginInstance.initialize(cordova.getActivity(), NaverResources.OAUTH_CLIENT_ID,
                     NaverResources.OAUTH_CLIENT_SECRET, NaverResources.OAUTH_CLIENT_NAME);
         }catch (Exception e) {
 
@@ -62,11 +68,8 @@ public class NaverCordovaSDK extends CordovaPlugin {
         cordova.getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-//                OAuthLoginDefine.LOGIN_BY_WEBVIEW_ONLY = true;
-                mOAuthLoginInstance.startOauthLoginActivity(
-                        cordova.getActivity(),
-                        new NaverOAuthLoginHandler(cordova.getActivity(), callbackContext)
-                );
+                mOAuthLoginInstance.setBehavior(NidOAuthBehavior.DEFAULT);
+                mOAuthLoginInstance.authenticate(cordova.getActivity(), new NaverOAuthLoginHandler(cordova.getActivity(), callbackContext));
             }
         });
 
@@ -74,49 +77,82 @@ public class NaverCordovaSDK extends CordovaPlugin {
 
 
     private void logout(CallbackContext callbackContext) {
-        mOAuthLoginInstance.logout(cordova.getActivity());
+        mOAuthLoginInstance.logout();
         callbackContext.success();
     }
 
 
     private void unlinkApp(CallbackContext callbackContext) {
         Context context = cordova.getActivity();
-        boolean isSuccessDeleteToken = mOAuthLoginInstance.logoutAndDeleteToken(cordova.getActivity());
-        try {
-            if (isSuccessDeleteToken) {
+        new NidOAuthLogin().callDeleteTokenApi(cordova.getActivity(), new OAuthLoginCallback() {
+            @Override
+            public void onSuccess() {
                 callbackContext.success();
-            } else {
-                JSONObject jsonObject = new JSONObject();
-
-                String errorCode = mOAuthLoginInstance.getLastErrorCode(context).getCode();
-                String errorDescription = mOAuthLoginInstance.getLastErrorDesc(context);
-
-                jsonObject.put("code", errorCode);
-                jsonObject.put("description", errorDescription);
-
-                callbackContext.error(jsonObject);
             }
+
+            @Override
+            public void onFailure(int i, String s) {
+                errorCallback(callbackContext);
+            }
+
+            @Override
+            public void onError(int i, String s) {
+                errorCallback(callbackContext);
+            }
+        });
+
+    }
+
+
+    private void refreshAccessToken(CallbackContext callbackContext) {
+        new NidOAuthLogin().callRefreshAccessTokenApi(cordova.getActivity(), new OAuthLoginCallback() {
+            @Override
+            public void onSuccess() {
+                String accessToken = mOAuthLoginInstance.getAccessToken();
+                callbackContext.success(accessToken);
+            }
+
+            @Override
+            public void onFailure(int i, String s) {
+                errorCallback(callbackContext);
+            }
+
+            @Override
+            public void onError(int i, String s) {
+                errorCallback(callbackContext);
+            }
+        });
+
+    }
+
+
+    private void getAccessToken(CallbackContext callbackContext) {
+        String accessToken = mOAuthLoginInstance.getAccessToken();
+        callbackContext.success(accessToken);
+    }
+
+    private void errorCallback(CallbackContext callbackContext) {
+        JSONObject resultObject = new JSONObject();
+        try {
+
+            String errorCode = mOAuthLoginInstance.getLastErrorCode().getCode();
+            String errorDescription = mOAuthLoginInstance.getLastErrorDescription();
+
+            resultObject.put("code", errorCode);
+            resultObject.put("description", errorDescription);
+
+            callbackContext.error(resultObject);
+
         } catch (Exception e) {
             callbackContext.error(e.getMessage());
         }
     }
 
-
-    private void refreshAccessToken(CallbackContext callbackContext) {
-        String accessToken = mOAuthLoginInstance.refreshAccessToken(cordova.getActivity());
-        callbackContext.success(accessToken);
-    }
-
-
-    private void getAccessToken(CallbackContext callbackContext) {
-        String accessToken = mOAuthLoginInstance.getAccessToken(cordova.getActivity());
-        callbackContext.success(accessToken);
-    }
-
-    private class NaverOAuthLoginHandler extends OAuthLoginHandler {
+    private class NaverOAuthLoginHandler implements OAuthLoginCallback {
 
         private CallbackContext mCallbackContext;
         private Context mContext;
+
 
         NaverOAuthLoginHandler(Context context, CallbackContext callbackContext) {
             mContext = context;
@@ -124,83 +160,70 @@ public class NaverCordovaSDK extends CordovaPlugin {
         }
 
         @Override
-        public void run(boolean isSuccess) {
-            Log.d(LOG_TAG, "isSuccess "+isSuccess);
+        public void onError(int i, String s) {
+            errorCallback(mCallbackContext);
+        }
 
-            JSONObject resultObject = new JSONObject();
+        @Override
+        public void onFailure(int i, String s) {
+            errorCallback(mCallbackContext);
+        }
+
+        @Override
+        public void onSuccess() {
             try {
-                if (isSuccess) {
-                    new RequestApiTask().execute(mContext, mCallbackContext);
-                } else {
-                    String errorCode = mOAuthLoginInstance.getLastErrorCode(mContext).getCode();
-                    String errorDescription = mOAuthLoginInstance.getLastErrorDesc(mContext);
+                new NidOAuthLogin().callProfileApi(new NidProfileCallback<NidProfileResponse>() {
+                    @Override
+                    public void onSuccess(NidProfileResponse nidProfileResponse) {
+                        Gson gson = new Gson();
 
-                    resultObject.put("code", errorCode);
-                    resultObject.put("description", errorDescription);
+                        JSONObject resultObject = new JSONObject();
 
-                    mCallbackContext.error(resultObject);
-                }
+                        try{
+                            String jsonString = gson.toJson(nidProfileResponse);
+                            JSONObject prop = new JSONObject(jsonString);
+
+                            String accessToken = mOAuthLoginInstance.getAccessToken();
+                            String refreshToken = mOAuthLoginInstance.getRefreshToken();
+                            long expiresAt = mOAuthLoginInstance.getExpiresAt();
+                            String tokenType = mOAuthLoginInstance.getTokenType();
+
+                            JSONObject userinfo = new JSONObject();
+
+                            userinfo.put("accessToken", accessToken);
+                            userinfo.put("refreshToken", refreshToken);
+                            userinfo.put("expiresAt", expiresAt);
+                            userinfo.put("tokenType", tokenType);
+
+                            JSONObject[] objs = new JSONObject[] { userinfo, (JSONObject) prop.get("response") };
+
+                            for (JSONObject obj : objs) {
+                                Iterator it = obj.keys();
+                                while (it.hasNext()) {
+                                    String key = (String)it.next();
+                                    resultObject.put(key, obj.get(key));
+                                }
+                            }
+                            mCallbackContext.success(resultObject);
+                        }catch (Exception e){
+                            e.printStackTrace();
+                            mCallbackContext.error(e.getMessage());
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(int i, String s) {
+                        errorCallback(mCallbackContext);
+                    }
+
+                    @Override
+                    public void onError(int i, String s) {
+                        errorCallback(mCallbackContext);
+                    }
+                });
             } catch (Exception e) {
                 mCallbackContext.error(e.getMessage());
             }
-        }
-    }
-
-
-    private class RequestApiTask extends AsyncTask<Object, Void, String> {
-        private CallbackContext mCallbackContext;
-        private Context mContext;
-
-        @Override
-        protected String doInBackground(Object... args) {
-            mContext = (Context) args[0];
-            mCallbackContext = (CallbackContext)args[1];
-
-            String url = "https://openapi.naver.com/v1/nid/me";
-            String at = mOAuthLoginInstance.getAccessToken(mContext);
-            return mOAuthLoginInstance.requestApi(mContext, at, url);
-        }
-
-        @Override
-        protected void onPreExecute() {
-
-        }
-
-
-        protected void onPostExecute(String content) {
-            if(content == null){
-                mCallbackContext.error("API call failed");
-                return;
-            }
-            JSONObject resultObject = new JSONObject();
-
-            try{
-                String accessToken = mOAuthLoginInstance.getAccessToken(mContext);
-                String refreshToken = mOAuthLoginInstance.getRefreshToken(mContext);
-                long expiresAt = mOAuthLoginInstance.getExpiresAt(mContext);
-                String tokenType = mOAuthLoginInstance.getTokenType(mContext);
-
-                JSONObject userinfo = new JSONObject();
-
-                userinfo.put("accessToken", accessToken);
-                userinfo.put("refreshToken", refreshToken);
-                userinfo.put("expiresAt", expiresAt);
-                userinfo.put("tokenType", tokenType);
-
-                JSONObject prop = new JSONObject(content.toString());
-                JSONObject[] objs = new JSONObject[] { userinfo, (JSONObject) prop.get("response") };
-                for (JSONObject obj : objs) {
-                    Iterator it = obj.keys();
-                    while (it.hasNext()) {
-                        String key = (String)it.next();
-                        resultObject.put(key, obj.get(key));
-                    }
-                }
-                mCallbackContext.success(resultObject);
-            }catch (Exception e){
-                mCallbackContext.error(e.getMessage());
-            }
-
         }
     }
 }
